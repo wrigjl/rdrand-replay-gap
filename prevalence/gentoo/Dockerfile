@@ -1,40 +1,47 @@
 # Gentoo RDRAND prevalence study
 #
-# Build on a host with RDRAND support (Ivy Bridge / Bulldozer or
-# later) so that -march=native enables -mrdrnd.
+# Builds with -march=haswell (not -march=native) so the result
+# does not depend on the host CPU.  Haswell is the lowest x86
+# microarchitecture that enables RDRAND (Ivy Bridge has it too,
+# but Haswell is the conventional baseline target).
 #
 # Usage:
 #   docker build -t gentoo-rdrand .
-#   docker run --rm gentoo-rdrand /scan/scan_rdrand.sh \
-#       /usr/bin /usr/sbin /usr/lib /usr/libexec
+#   docker run --rm gentoo-rdrand /scan/scan_rdrand.sh
+#
+# After running this, capture reproducibility metadata:
+#   docker run --rm gentoo-rdrand emerge --info > emerge-info.txt
+#   docker run --rm gentoo-rdrand date -u > portage-snapshot-date.txt
 #
 FROM gentoo/stage3:latest
 
-# Confirm -march=native enables RDRAND on this host CPU.
-# The build will fail early if it does not.
-RUN echo 'int main(){}' > /tmp/test.c \
-    && gcc -march=native -dM -E /tmp/test.c | grep -q __RDRND__ \
-    || { echo "Host CPU lacks RDRAND; -march=native will not" \
-         "enable -mrdrnd. Run on Ivy Bridge or later." >&2; \
-         exit 1; } \
-    && rm /tmp/test.c
-
-# Set -march=native (Gentoo recommended default) so that all
-# compiled code may use RDRAND intrinsics without CPUID checks.
+# Use -march=haswell so the package set RDRAND-emits identically
+# on any host (Haswell is the minimum that includes RDRAND).
 RUN sed -i \
-    's/^COMMON_FLAGS=.*/COMMON_FLAGS="-march=native -O2 -pipe"/' \
+    's/^COMMON_FLAGS=.*/COMMON_FLAGS="-march=haswell -O2 -pipe"/' \
     /etc/portage/make.conf \
     && echo "MAKEOPTS=\"-j$(nproc)\"" >> /etc/portage/make.conf \
     && echo 'FEATURES="-sandbox -usersandbox -pid-sandbox"' \
        >> /etc/portage/make.conf
 
+# Confirm -march=haswell enables RDRAND.
+RUN echo 'int main(){}' > /tmp/test.c \
+    && gcc -march=haswell -dM -E /tmp/test.c | grep -q __RDRND__ \
+    || { echo "gcc -march=haswell did not define __RDRND__;" \
+         "compiler is misconfigured." >&2; \
+         exit 1; } \
+    && rm /tmp/test.c
+
 # Accept licenses needed by some crypto packages.
 RUN echo 'ACCEPT_LICENSE="*"' >> /etc/portage/make.conf
 
-# Sync the portage tree.
+# Sync the portage tree.  This snapshot is NOT pinned -- emerge
+# --sync pulls whatever is current on the day of build, which is
+# the principal source of reproducibility drift on Gentoo (see
+# Gentoo Reproducibility Caveats in the artifact README).
 RUN emerge --sync --quiet
 
-# Rebuild the entire system with -march=native.  Portage
+# Rebuild the entire system with -march=haswell.  Portage
 # handles dependency ordering (gcc and glibc before everything
 # that depends on them).  This is slow but produces an image
 # that accurately represents a real Gentoo installation.

@@ -116,6 +116,46 @@ cd experiments/exp2-intrinsic/
 ./exp2-control.sh     # control build: replay faithful
 ```
 
+## Gentoo reproducibility caveats
+
+Gentoo is rolling-release.  Three sources of drift mean that
+exact-count reproduction is not guaranteed:
+
+1. **Portage tree**.  `emerge --sync` pulls the current
+   snapshot at build time.  Package versions change daily, so
+   a rebuild a week later may install different upstream
+   versions.  The artifact's Dockerfile does not pin a portage
+   snapshot.
+2. **Compiler target**.  The Dockerfile sets `-march=haswell`
+   (rather than the host-dependent `-march=native` used during
+   the paper's original scan) so the RDRAND-emitting package
+   set is identical on any host CPU that includes Haswell as
+   a strict superset.  Reproducers should not change this.
+3. **USE flags**.  Defaults shift over time; this affects
+   which optional features compile in and whether some
+   binaries are produced at all.
+
+What is and is not robust to drift:
+
+| Claim in paper                              | Reproducible across snapshots? |
+|---------------------------------------------|--------------------------------|
+| All Gentoo `RDRAND` callers use CPUID gating | ✅ Structural; would only change if a library adopts compiler intrinsics |
+| No application code gained `RDRAND` via intrinsics | ✅ Robust unless upstream `getrandom`/`ring`/etc. policy changes |
+| Exact count of 22 RDRAND-containing binaries | ❌ Drifts with package versions |
+| Exact count of 1{,}940 ELF binaries scanned   | ❌ Drifts with USE flags + package set |
+
+When reproducing, capture the snapshot context alongside the
+scan output:
+
+```bash
+docker run --rm gentoo-rdrand emerge --info > emerge-info.txt
+docker run --rm gentoo-rdrand date -u > portage-snapshot-date.txt
+```
+
+The paper's numbers correspond to the snapshot captured during
+the original scan; the date and `emerge --info` output for that
+run are committed under `prevalence/gentoo/snapshot/`.
+
 ## Known limitations of this artifact
 
 - The Debian 13 (Trixie) corpus referenced in the paper's
