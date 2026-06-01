@@ -143,5 +143,10 @@ cd experiments/exp2-intrinsic/
 
 ## License
 
-MIT (see `LICENSE`). Notes and Dockerfiles are provided under the
-same terms.
+Creative Commons Attribution 4.0 International
+(CC&nbsp;BY&nbsp;4.0; see `LICENSE`).  Code, Dockerfiles,
+notes, and data in this repository are all provided under the
+same terms: use, modify, and redistribute freely with
+attribution.
+
+Copyright © 2026 Jason L. Wright.
