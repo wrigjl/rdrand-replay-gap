@@ -20,6 +20,7 @@ RUN apt-get update && \
         task-gnome-desktop \
         binutils \
         file \
+        libbotan-1.10-1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Scan scripts are copied in by the build context.

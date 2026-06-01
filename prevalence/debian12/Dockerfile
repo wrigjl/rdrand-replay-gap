@@ -1,8 +1,9 @@
-FROM debian:11
+FROM debian:12
 
-# Debian 11 (Bullseye) is on LTS until 2026-08-31.  After that
-# date, switch the apt sources to archive.debian.org following
-# the pattern used in debian8/Dockerfile and debian9/Dockerfile.
+# Debian 12 (Bookworm).  Regular support ends 2026-06-09; LTS
+# until June 2028.  After regular-support EOL, switch the apt
+# sources to security.debian.org's LTS repos.  After LTS EOL,
+# switch to archive.debian.org following the debian8/9/10 pattern.
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -10,7 +11,7 @@ RUN apt-get update && \
         task-gnome-desktop \
         binutils \
         file \
-        libbotan-2-17 \
+        libbotan-2-19 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Scan scripts are copied in by the build context.
