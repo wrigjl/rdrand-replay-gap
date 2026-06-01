@@ -2,7 +2,13 @@
 #
 # scan_rdrand.sh -- scan ELF binaries for RDRAND/RDSEED instructions
 #
-# Usage: scan_rdrand.sh /usr/bin /usr/lib ...
+# Usage: scan_rdrand.sh [path ...]
+#
+# With no arguments, scans the default set:
+#   /bin /sbin /lib /usr/bin /usr/sbin /usr/lib /usr/libexec /usr/share
+# On usr-merged systems, /bin /sbin /lib are symlinks to their /usr/
+# counterparts; these are filtered out automatically so each
+# directory is scanned exactly once.
 #
 # For each ELF binary found under the given paths, disassemble it
 # and check for rdrand/rdseed. If either is present, print the
@@ -14,8 +20,24 @@
 #
 # Summary at end on stderr.
 
+DEFAULT_PATHS="/bin /sbin /lib /usr/bin /usr/sbin /usr/lib /usr/libexec /usr/share"
+
 if [ $# -eq 0 ]; then
-    echo "usage: $0 path [path ...]" >&2
+    set -- $DEFAULT_PATHS
+fi
+
+# Drop nonexistent paths and symlinks (the latter to avoid
+# double-scanning usr-merged directories).
+filtered=
+for p in "$@"; do
+    [ -e "$p" ] || continue
+    [ -L "$p" ] && continue
+    filtered="$filtered $p"
+done
+set -- $filtered
+
+if [ $# -eq 0 ]; then
+    echo "no valid paths to scan" >&2
     exit 1
 fi
 

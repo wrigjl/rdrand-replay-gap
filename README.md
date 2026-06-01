@@ -14,8 +14,10 @@ results in the paper.
 ## Status
 
 Currently **private** while the camera-ready is being prepared.
-Will be made public by the conference start date (24 August 2026).
-The paper cites this repository as the reproducibility artifact.
+Will be flipped public at camera-ready submission
+(target 2026-06-13), tagged as `v1.0`, so the URL printed in
+the paper resolves from the moment the camera-ready is sent
+to Springer.
 
 ## Repository layout
 
@@ -86,9 +88,15 @@ notes/
 **Prevalence scan** (paper §4):
 
 ```bash
-./scripts/scan_rdrand.sh /usr/bin /usr/sbin /usr/lib /usr/libexec /usr/share
+./scripts/scan_rdrand.sh   # uses default path set; pass paths to override
 ./scripts/check_rdrand_gating.sh <binary-path>
 ```
+
+The default scan set is
+`/bin /sbin /lib /usr/bin /usr/sbin /usr/lib /usr/libexec /usr/share`.
+On usr-merged systems (Debian 12+, Gentoo with merged-usr profile),
+`/bin /sbin /lib` are symlinks and are filtered out automatically
+so each directory is scanned exactly once.
 
 To regenerate the per-release corpora used in the paper, build
 each `prevalence/<distro>/Dockerfile` and run `scan_rdrand.sh`
