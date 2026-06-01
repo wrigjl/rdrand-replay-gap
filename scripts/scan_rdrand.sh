@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# scan_rdrand.sh -- scan ELF binaries for RDRAND/RDSEED instructions
+#
+# Usage: scan_rdrand.sh /usr/bin /usr/lib ...
+#
+# For each ELF binary found under the given paths, disassemble it
+# and check for rdrand/rdseed. If either is present, print the
+# filename and all rdrand/rdseed/cpuid lines from the disassembly.
+#
+# Output format per binary:
+#   === /path/to/binary ===
+#   <matching disassembly lines>
+#
+# Summary at end on stderr.
+
+if [ $# -eq 0 ]; then
+    echo "usage: $0 path [path ...]" >&2
+    exit 1
+fi
+
+tmpfile=$(mktemp)
+trap 'rm -f "$tmpfile"' EXIT
+
+scanned=0
+matched=0
+
+for f in $(find "$@" -xdev -type f 2>/dev/null); do
+    # Skip non-ELF files quickly via magic bytes
+    head -c 4 "$f" 2>/dev/null | grep -q "^.ELF" || continue
+
+    scanned=$((scanned + 1))
+
+    objdump -d "$f" 2>/dev/null \
+        | grep -E '\b(cpuid|rdrand|rdseed)\b' > "$tmpfile"
+
+    if grep -qE '\b(rdrand|rdseed)\b' "$tmpfile"; then
+        matched=$((matched + 1))
+        echo "=== $f ==="
+        cat "$tmpfile"
+        echo
+    fi
+
+    if [ $((scanned % 100)) -eq 0 ]; then
+        echo "  ... scanned $scanned files, $matched hits" >&2
+    fi
+done
+
+echo "scanned $scanned binaries, $matched contain rdrand/rdseed" >&2

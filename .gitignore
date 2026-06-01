@@ -1,0 +1,18 @@
+# Build artifacts
+target/
+*.o
+a.out
+*.exe
+
+# Binary tarballs (regenerate via Dockerfiles; do not commit)
+*.txz
+*.tar.xz
+*.tar.gz
+
+# rr traces
+.rr-trace*/
+
+# Editor
+.DS_Store
+*~
+*.swp

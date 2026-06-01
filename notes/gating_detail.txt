@@ -1,0 +1,46 @@
+  GATED   000000000423d400 <napi_close_handle_scope>:
+  GATED   000000000421f5b0 <napi_close_handle_scope>:
+  GATED   000000000092e200 <PyInit__symtable@@libpython312.so>:
+  UNGATED 0000000001af9070 <_ZNSt12_GLOBAL__N_112__x86_rdrandEPv>:
+  UNGATED 0000000001af90b0 <_ZNSt12_GLOBAL__N_112__x86_rdseedEPv>:
+  UNGATED 0000000001af91a0 <_ZNSt12_GLOBAL__N_119__x86_rdseed_rdrandEPv>:
+  UNGATED 00000000004ba930 <_ZNSt12_GLOBAL__N_112__x86_rdrandEPv>:
+  UNGATED 00000000004ba970 <_ZNSt12_GLOBAL__N_112__x86_rdseedEPv>:
+  UNGATED 00000000004baa60 <_ZNSt12_GLOBAL__N_119__x86_rdseed_rdrandEPv>:
+  UNGATED 00000000011f0a70 <_ZNSt12_GLOBAL__N_112__x86_rdrandEPv>:
+  UNGATED 00000000011f0ab0 <_ZNSt12_GLOBAL__N_112__x86_rdseedEPv>:
+  UNGATED 00000000011f0ba0 <_ZNSt12_GLOBAL__N_119__x86_rdseed_rdrandEPv>:
+  UNGATED 000000000493b770 <_ZNSt12_GLOBAL__N_112__x86_rdrandEPv>:
+  UNGATED 000000000493b7b0 <_ZNSt12_GLOBAL__N_112__x86_rdseedEPv>:
+  UNGATED 000000000493b8a0 <_ZNSt12_GLOBAL__N_119__x86_rdseed_rdrandEPv>:
+  GATED   0000000000421fc0 <_obstack_newchunk@@Base>:
+  GATED   0000000000420060 <_obstack_newchunk@@Base>:
+  GATED   000000000043b500 <_obstack_newchunk@@Base>:
+  GATED   000000000043b5e0 <_obstack_newchunk@@Base>:
+  UNGATED 0000000001a52ab0 <_ZNSt13random_device14_M_init_pretr1ERKSs@@Base>:
+  GATED   000000000043b400 <_obstack_newchunk@@Base>:
+  GATED   00000000004278c0 <_obstack_newchunk@@Base>:
+  UNGATED 0000000000037040 <crypto_aead_aes256gcm_keygen@@Base>:
+  UNGATED 0000000000205740 <_ZNSt5dequeINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEESaIS5_EE16_M_push_back_auxIJRKS5_EEEvDpOT_@@Base>:
+  UNGATED 00000000003960d0 <_ZN5Botan13Processor_RNG6reseedERNS_15Entropy_SourcesEmNSt6chrono8durationIlSt5ratioILl1ELl1000EEEE@@Base>:
+  UNGATED 0000000000289660 <CRYPTO_memcmp@@OPENSSL_3.0.0>:
+  GATED   0000000000007600 <OSSL_provider_init@@Base-0xb50>:
+  UNGATED 00000000000dfc60 <__once_proxy@@GLIBCXX_3.4.11>:
+  GATED   0000000000013370 <gcry_is_secure@@GCRYPT_1.6>:
+  GATED   0000000000157000 <.text>:
+  UNGATED 0000000000039260 <_start@@Base>:
+  UNGATED 000000000239a000 <_start@@Base>:
+  GATED   0000000000024bc0 <.text>:
+  UNGATED 0000000001cb8190 <_ZNSt13random_device14_M_init_pretr1ERKSs@@Base>:
+  GATED   000000000042b6c0 <_obstack_newchunk@@Base>:
+  UNGATED 0000000001a537b0 <_ZNSt13random_device14_M_init_pretr1ERKSs@@Base>:
+  UNGATED 0000000001b11cf0 <_ZNSt13random_device14_M_init_pretr1ERKSs@@Base>:
+  GATED   00000000000054c0 <.text>:
+  GATED   0000000000426050 <_obstack_newchunk@@Base>:
+
+--- summary ---
+Analyzed:  30 binaries
+GATED:     16
+UNGATED:   14
+MIXED:     0
+NONE:      0
