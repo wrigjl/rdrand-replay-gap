@@ -73,12 +73,17 @@ RUN emerge --autounmask=y --autounmask-write=y --autounmask-continue \
     -e --quiet-build --jobs=$(nproc) \
     --exclude sys-apps/portage @world
 
-# Emerge additional packages not in the stage3 that are
-# relevant to the RDRAND prevalence comparison with Debian:
+# Emerge additional packages relevant to the RDRAND prevalence
+# comparison with Debian:
 #   - crypto libraries (libgcrypt, libsodium, botan)
 #   - BoringSSL-style code (nss as proxy; chromium too large)
 #   - common networked utilities
+#   - GNOME desktop (gnome-light) to make the binary count
+#     comparable to Debian's task-gnome-desktop image.  Doubles
+#     or triples the compile time but is what the original
+#     paper scan implicitly measured.
 RUN emerge --quiet-build --jobs=$(nproc) \
+    --autounmask=y --autounmask-write=y --autounmask-continue \
     dev-libs/libgcrypt \
     dev-libs/libsodium \
     dev-libs/botan \
@@ -86,7 +91,8 @@ RUN emerge --quiet-build --jobs=$(nproc) \
     app-crypt/gnupg \
     net-misc/openssh \
     net-misc/curl \
-    app-editors/vim
+    app-editors/vim \
+    gnome-base/gnome-light
 
 # Copy scan scripts into the image.
 COPY scan_rdrand.sh check_rdrand_gating.sh /scan/

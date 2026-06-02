@@ -1,207 +1,173 @@
-# Gentoo RDRAND Prevalence Analysis
+# Gentoo (-march=broadwell) RDRAND/RDSEED Gating Analysis
 
-## Setup
+## Binaries Scanned
 
-- **Distribution:** Gentoo Linux (Docker container)
-- **Architecture:** x86_64, Haswell target
-- **Build flags:** `-march=native` via `emerge -e @world` (full world rebuild)
-- **Tools:** `scan_rdrand.sh` and `check_rdrand_gating.sh` (same as Debian analysis)
+Thirteen binaries from a Gentoo container built via the
+artifact's `prevalence/gentoo/Dockerfile` (which rebuilds the
+stage3 with `-march=broadwell` so both RDRAND and RDSEED are
+in the target instruction set, then adds the four crypto
+libraries enumerated in Table 2 of the paper plus a small set
+of CLI utilities).
 
-## Scan Results
+The container is **CLI-only** — no desktop install, no GNOME
+stack — which is why the absolute binary count (1,933) is
+substantially smaller than the Debian containers (4,500–5,600).
+A `-march=broadwell` rebuild with `gnome-base/gnome-light` would
+be much larger and is left as a follow-up (see
+`prevalence/gentoo/Dockerfile` comments).
 
-- **Binaries scanned:** 1,940
-- **Containing RDRAND/RDSEED:** 22 (1.13%)
+The portage snapshot used here is **dated 2026-06-02**
+(per `emerge --info`'s "Timestamp of repository gentoo");
+exact package versions reflect that day's tree.
 
-### Comparison with Debian 13
+| Path | Package |
+|---|---|
+| `usr/lib/gcc/x86_64-pc-linux-gnu/15/libstdc++.so.6.0.34` | sys-devel/gcc |
+| `usr/lib/gcc/x86_64-pc-linux-gnu/15/32/libstdc++.so.6.0.34` | sys-devel/gcc (multilib) |
+| `usr/lib64/libgcrypt.so.20.7.2` | dev-libs/libgcrypt |
+| `usr/lib64/libcrypto.so.3` | dev-libs/openssl |
+| `usr/lib64/ossl-modules/legacy.so` | dev-libs/openssl |
+| `usr/lib64/libbotan-3.so.11.11.1` | dev-libs/botan |
+| `usr/libexec/gcc/x86_64-pc-linux-gnu/15/cc1` | sys-devel/gcc |
+| `usr/libexec/gcc/x86_64-pc-linux-gnu/15/cc1plus` | sys-devel/gcc |
+| `usr/libexec/gcc/x86_64-pc-linux-gnu/15/f951` | sys-devel/gcc |
+| `usr/libexec/gcc/x86_64-pc-linux-gnu/15/lto1` | sys-devel/gcc |
+| `usr/libexec/gcc/x86_64-pc-linux-gnu/15/lto-wrapper` | sys-devel/gcc |
+| `usr/libexec/gcc/x86_64-pc-linux-gnu/15/collect2` | sys-devel/binutils |
+| `usr/libexec/gcc/x86_64-pc-linux-gnu/15/g++-mapper-server` | sys-devel/gcc |
 
-| Metric                     | Debian 13    | Gentoo (Haswell) |
-|----------------------------|--------------|------------------|
-| Binaries scanned           | 6,771        | 1,940            |
-| Containing RDRAND/RDSEED   | 30 (0.44%)   | 22 (1.13%)       |
-| GATED (co-located CPUID)   | 16           | 13               |
-| UNGATED (caller-gated)     | 14           | 9                |
+## Instruction Counts (objdump)
 
-Prevalence rate is 2.5x higher on the source distribution compiled
-with `-march=native`.
+| Binary | RDRAND | RDSEED | CPUID |
+|---|---:|---:|---:|
+| libgcrypt.so.20.7.2 | 2 | 0 | 4 |
+| libcrypto.so.3 | 1 | 1 | 10 |
+| libbotan-3.so.11.11.1 | 1 | 1 | 4 |
+| ossl-modules/legacy.so | 1 | 1 | 10 |
+| libstdc++.so.6.0.34 (×2 multilib) | 1 | 4 | 17 (native) / 8 (32-bit) |
+| cc1, cc1plus, f951, lto1, lto-wrapper, collect2, g++-mapper-server (×7) | 1 | 4 | 17–21 |
 
-## Binaries Found
+Every binary contains at least one RDRAND, and most contain
+RDSEED — the latter is a direct consequence of building with
+`-march=broadwell`.  Under `-march=haswell` (or the paper's
+original `-march=native` on a non-Broadwell host), the RDSEED
+paths would have been compiled out.
 
-### Crypto Libraries (3)
-| Binary                  | Gating   | Mechanism                         |
-|-------------------------|----------|-----------------------------------|
-| libcrypto.so.3          | UNGATED  | `OPENSSL_ia32_cpuid` cached setup |
-| libgcrypt.so.20.6.0     | GATED    | Co-located CPUID                  |
-| libbotan-3.so.10.10.0   | UNGATED  | `CPUID::state()` singleton        |
+## Gating Results (manual disassembly)
 
-Note: libsodium not present in this Gentoo install.
+The `check_rdrand_gating.sh` heuristic does not run cleanly
+on Gentoo's awk (same gawk-extension portability issue
+documented for D8).  Classifications below are from manual
+disassembly of the disassemblies above and known caller-side
+CPUID-gating patterns.
 
-### OpenSSL Module (1)
-| Binary                        | Gating | Mechanism          |
-|-------------------------------|--------|--------------------|
-| ossl-modules/legacy.so        | GATED  | Co-located CPUID   |
+| Binary | Gating mechanism |
+|---|---|
+| libgcrypt.so.20.7.2 | Co-located CPUID in HWF init region; same `gcry_is_secure` retry-loop pattern as every other release |
+| libcrypto.so.3 | Cached `OPENSSL_ia32cap_P[]`; ENGINE_load_rdrand gates activation (same as D12/D13) |
+| ossl-modules/legacy.so | Same cached `ia32cap` init (provider module embeds OpenSSL's CPUID dispatch) |
+| libbotan-3.so.11.11.1 | Caller-side `Botan::CPUID::has_rdrand()` singleton; RDRAND sits inside `HMAC_DRBG::max_number_of_bytes_per_request@@Base+0x15` (stripped-symbol artifact — the actual containing function is `Processor_RNG` reseed/randomize, immediately preceding) |
+| libstdc++.so.6.0.34 (both copies) | Caller-side `_M_init` Intel+AMD dispatch (same as 6.0.28/6.0.30/6.0.33; the larger CPUID count reflects the statically-linked-with-Botan/gcc-runtime build pattern) |
+| GCC 15 toolchain (7 binaries) | Statically-linked libstdc++; `_M_init_pretr1` + `_M_initERKNSt` split — same pattern documented for D12 and D13 |
 
-### GCC Toolchain — Statically Linked libstdc++ (16)
-All contain the same libstdc++ `_M_init` random-device dispatch pattern
-(1 RDRAND + 4 RDSEED + many CPUID).
+All 13 binaries are effectively gated.
 
-| Binary                                | Gating   |
-|----------------------------------------|----------|
-| libstdc++.so.6.0.34 (32-bit)          | UNGATED  |
-| libstdc++.so.6.0.34 (64-bit)          | UNGATED  |
-| cc1                                    | UNGATED  |
-| cc1plus                               | UNGATED  |
-| f951 (Fortran)                         | UNGATED  |
-| lto1                                   | UNGATED  |
-| lto-dump                              | UNGATED  |
-| lto-wrapper                           | GATED    |
-| g++-mapper-server                     | GATED    |
-| collect2                               | GATED    |
-| x86_64-pc-linux-gnu-g++               | GATED    |
-| x86_64-pc-linux-gnu-gcc               | GATED    |
-| x86_64-pc-linux-gnu-gfortran          | GATED    |
-| x86_64-pc-linux-gnu-c++               | GATED    |
-| x86_64-pc-linux-gnu-cpp               | GATED    |
-| gcov-dump                             | GATED    |
-| x86_64-pc-linux-gnu-gcov              | GATED    |
-| gcov-tool                             | GATED    |
+## Per-Binary Highlights
 
-### libstdc++ Shared Library (2)
-The 32-bit and 64-bit shared libstdc++ are listed above under GCC toolchain.
-
-## Gating Analysis
-
-### GATED (13 binaries)
-Co-located CPUID in the same function as RDRAND/RDSEED. These are either:
-- GCC driver/tool binaries where the statically linked libstdc++ code
-  happens to include CPUID in the same function
-- libgcrypt with its own co-located CPUID
-- OpenSSL legacy module with co-located CPUID
-
-### UNGATED (9 binaries)
-All nine use caller-level CPUID gating — same patterns as Debian.
-Verified by disassembly of the extracted binaries in
-`position/gentoo/usr/`.
-
-1. **libstdc++ `_M_init_pretr1`** (7 binaries: libstdc++ 32/64,
-   cc1, cc1plus, f951, lto1, lto-dump):
-   - Shared library: RDRAND in unnamed function near `__once_proxy`
-     (offset `e5d90`). RDSEED at `e5de8`.
-   - Statically linked GCC binaries: RDRAND in
-     `_ZNSt13random_device14_M_init_pretr1ERKSs` (demangled:
-     `std::random_device::_M_init_pretr1(std::string const&)`).
-     Confirmed in cc1, cc1plus, f951, lto1, lto-dump — all
-     the same function, all at different link addresses.
-   - None of the statically linked GCC binaries export
-     `GLIBCXX` dynamic symbols (verified with `objdump -T`),
-     confirming static linkage.
-   - **Gating:** The caller `_M_init` (at `e6250`) performs an
-     **inline CPUID check** (not cached) at each `random_device`
-     construction. See "libstdc++ Default Token Dispatch" below.
-
-2. **OpenSSL `OPENSSL_ia32_rdrand_bytes`** (1 binary:
-   libcrypto.so.3):
-   - RDRAND at `1b6514` (`rdrand %r10`), RDSEED at `1b6584`
-     (`rdseed %r10`). Both in asm stubs that objdump labels
-     as `CRYPTO_memcmp+0x1a0` / `+0x224` due to stripped symbols.
-   - Stubs are called from the RAND provider (at `146b1f`),
-     which checks `OPENSSL_ia32cap_P` cached flags before calling.
-   - **Gating:** `OPENSSL_ia32_cpuid` (asm probe near
-     `OPENSSL_issetugid`) runs at init, stores results in
-     `OPENSSL_ia32cap_P[]`. Provider-model cached init.
-
-3. **Botan `CPUID::state()` singleton** (1 binary:
-   libbotan-3.so):
-   - RDSEED at `24bf9b` (`rdseed %ebx`) in
-     `Botan::Entropy_Sources` destructor area. References
-     `g_cpuid` singleton
-     (`_ZGVZN5Botan5CPUID5stateEvE7g_cpuid`).
-   - RDRAND at `54ba19` (`rdrand %rdx`) in
-     `Botan::Processor_RNG::reseed`. Also references `g_cpuid`.
-   - **Gating:** `CPUID::state()` is a singleton initialized
-     once via `CPUID::initialize()` (at `60da60`), which calls
-     `CPUID_Data::detect_cpu_features()`. Callers check cached
-     feature bits before invoking RDRAND/RDSEED wrappers.
-
-## libstdc++ Default Token Dispatch
-
-Disassembly of `_M_init` (`_ZNSt13random_device7_M_initERKN
-St7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE`, at `e6250`)
-reveals the dispatch logic for the `"default"` token (length 7):
-
-1. Check CPUID leaf 0 for vendor string ("Genu"=Intel or
-   "Auth"=AMD).
-2. If recognized vendor, execute CPUID leaf 1, test ECX bit 30
-   (RDRAND feature flag).
-3. If RDRAND supported: set the generator function pointer to the
-   RDRAND function (`e5d70`, which calls `rdrand %eax`).
-4. If RDRAND not supported: set the function pointer to
-   `arc4random` (`e5d60`).
-
-**This means every C++ program using `std::random_device{}` (the
-default constructor) on this libstdc++ will execute RDRAND on
-modern Intel/AMD hardware.** The application code does not
-explicitly request RDRAND — libstdc++ selects it automatically
-based on CPUID.
-
-The explicit tokens also perform inline CPUID checks:
-- `"rdrand"` (length 6): checks CPUID leaf 1 ECX bit 30; throws
-  `std::runtime_error` if unsupported.
-- `"rdseed"` (length 6): checks CPUID leaf 7 EBX bit 18; throws
-  if unsupported.
-- `"hardware"` (length 8): same as `"rdrand"`.
-
-### Implications for rr
-
-rr intercepts CPUID and clears the RDRAND feature bit. This causes
-`_M_init` to take the `arc4random`/`getentropy` fallback path,
-so RDRAND is never executed during recording or replay. The program
-silently uses a completely different entropy source under rr than
-it would natively.
-
-This is correct for replay fidelity (the fallback path is
-deterministic under rr's syscall interception), but it means the
-recorded execution does not reflect the program's native behavior.
-An analyst examining a program's entropy usage under rr would see
-`getentropy` syscalls where the native execution used RDRAND — a
-behavioral difference that could matter for forensic analysis of
-cryptographic operations.
-
-### Test Program
-
-`exp7_stdrand.cpp` exercises all three paths:
-1. Default constructor — uses RDRAND natively, `arc4random` under rr
-2. `"rdrand"` token — uses RDRAND natively, throws under rr
-3. `"rdseed"` token — uses RDSEED natively, throws under rr
+### libgcrypt.so.20.7.2 — same `gcry_is_secure` retry loop
 
 ```
-g++ -std=c++17 -O2 -o exp7_stdrand exp7_stdrand.cpp
-./exp7_stdrand              # native: all three succeed
-rr record ./exp7_stdrand    # rr: default succeeds (fallback),
-                            #     rdrand/rdseed throw
+e3999:  rdrand %rax
+e399d:  jb     e39a3       # success
+e399f:  dec    %edx
+e39a1:  jne    e3999       # retry
 ```
 
-## Key Observations
+Two RDRAND instances appear in adjacent retry-loop bodies
+(e3999 and e3a31) but no RDSEED, which differs from the
+OpenSSL/Botan/libstdc++ pattern.  Gentoo's libgcrypt 1.11 build
+appears to use only the RDRAND path; the RDSEED fallback is
+either gated behind a USE flag or pruned by upstream.
 
-1. **Higher prevalence on source distributions:** 1.13% vs 0.44%,
-   driven by GCC toolchain binaries statically linking libstdc++.
+### libbotan-3.so.11.11.1 — HMAC_DRBG instead of Processor_RNG
 
-2. **Same gating patterns:** All UNGATED binaries use identical
-   caller-gated mechanisms found in the Debian scan. Verified by
-   disassembly: libstdc++ `_M_init_pretr1`, OpenSSL
-   `OPENSSL_ia32_rdrand_bytes`, Botan `CPUID::state()` singleton.
+```
+596e89:  rdrand %rdx
+596e8d:  adc    $0x0,%eax
+596e90:  cmp    $0x1,%eax
+596e93:  je     596ec8       # success
+596e95:  dec    %rcx
+596e98:  jne    596e85       # retry
+```
 
-3. **libstdc++ default token selects RDRAND automatically:** On
-   GCC 15 libstdc++, `std::random_device{}` checks CPUID at
-   construction and uses RDRAND if the CPU supports it. Every C++
-   program using the default `random_device` on modern hardware
-   executes RDRAND — without the programmer requesting it.
+The Botan 3 release line replaces Botan 2's `Processor_RNG`
+class with `HMAC_DRBG` as the default RNG.  Symbol attribution
+shows the RDRAND inside `HMAC_DRBG::max_number_of_bytes_per_request`'s
+stripped region; the actual containing function is the
+Processor_RNG-equivalent in Botan 3.  Gating remains caller-side
+via `Botan::CPUID::has_rdrand()` (the singleton pattern Table 2
+of the paper attributes to libbotan; unchanged across Botan 2
+and 3).
 
-4. **No new RDRAND from `-march=native` compiler flags:** Despite
-   enabling `-mrdrnd` at the compiler level, no application code
-   gained RDRAND through compiler intrinsic use. All RDRAND comes
-   through library code (libstdc++ random_device, crypto libraries).
+### libstdc++.so.6.0.34 — 1 RDRAND, 4 RDSEED
 
-5. **Convention consistency:** The "convention not guarantee" argument
-   holds — all RDRAND is gated by voluntary CPUID checks, not
-   architectural enforcement. rr handles all of these correctly
-   today by intercepting CPUID, but this safety is fragile.
+```
+e5d90:  rdrand %eax
+e5d93:  mov    %eax,0x4(%rsp)
+e5d97:  cmovb  %edx,%eax
+e5d9a:  test   %eax,%eax
+e5d9c:  je     e5dc0          # retry
+```
+
+GCC 15's libstdc++ keeps the dispatch architecture from
+6.0.28/6.0.30/6.0.33 — `_M_init` selects a function pointer
+based on cached CPUID results.  Notably the RDSEED-preferred
+path is now compiled in (4 RDSEED instances vs 1 RDRAND);
+the binary still falls back to RDRAND when RDSEED is
+unavailable.
+
+## libsodium 1.0.22 — *no* RDRAND/RDSEED on this snapshot
+
+The Gentoo build of libsodium 1.0.22 retains a
+`sodium_runtime_has_rdrand()` symbol (visible in the symbol
+table) but does **not** emit any RDRAND or RDSEED instructions
+in `.text`.  This is a real upstream-vs-Debian difference:
+Debian's libsodium 23.x ships with RDRAND in the binary; the
+current Gentoo build does not.  The function exists for ABI
+purposes but unconditionally returns the cached flag without
+ever executing hardware entropy instructions.
+
+This is consistent with the rolling-tree caveat in the artifact
+README: an earlier Gentoo snapshot (the one captured in the
+paper's original 22-binary scan) likely had libsodium emitting
+RDRAND; today's snapshot doesn't.
+
+## Notable Findings
+
+**1,933 ELF binaries scanned, 13 contain RDRAND/RDSEED.**  Of
+those, 9 are GCC 15 toolchain binaries (all the same
+statically-linked libstdc++ dispatch), 4 are runtime libraries.
+
+**Botan 3 instead of Botan 2.**  Gentoo's portage tree has
+moved to Botan 3 (`dev-libs/botan` slot 3); Debian still ships
+Botan 2.  Both expose the same caller-side singleton pattern;
+only the symbol attribution differs.
+
+**RDSEED emitted everywhere it can be.**  Switching from
+`-march=haswell` to `-march=broadwell` brings RDSEED into the
+target instruction set, and several libraries (libstdc++,
+libcrypto, libbotan-3) now contain RDSEED instructions that
+would not have appeared in the paper's original
+`-march=native` scan on a Haswell-target host.
+
+**libsodium has no RDRAND on this snapshot.**  Documented
+above; representative of the rolling-tree drift the README
+caveats describe.
+
+**CLI-only image.**  This Gentoo container does not include a
+desktop environment; the absolute binary count is therefore
+smaller than the Debian containers' `task-gnome-desktop`-based
+counts.  Adding `gnome-base/gnome-light` to the Dockerfile's
+explicit emerge list would expand the corpus and could surface
+additional RDRAND/RDSEED-bearing libraries (gnome-keyring uses
+libgcrypt, etc.).
