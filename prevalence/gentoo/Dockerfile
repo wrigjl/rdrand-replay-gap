@@ -1,9 +1,11 @@
-# Gentoo RDRAND prevalence study
+# Gentoo RDRAND/RDSEED prevalence study
 #
-# Builds with -march=haswell (not -march=native) so the result
-# does not depend on the host CPU.  Haswell is the lowest x86
-# microarchitecture that enables RDRAND (Ivy Bridge has it too,
-# but Haswell is the conventional baseline target).
+# Builds with -march=broadwell (not -march=native) so the result
+# does not depend on the host CPU.  Broadwell (5th gen Core,
+# 2014) is the earliest Intel microarchitecture that enables
+# both RDRAND *and* RDSEED; Haswell has RDRAND only.  Using
+# broadwell here makes both instruction families reachable
+# through -march alone.
 #
 # Usage:
 #   docker build -t gentoo-rdrand .
@@ -15,21 +17,23 @@
 #
 FROM gentoo/stage3:latest
 
-# Use -march=haswell so the package set RDRAND-emits identically
-# on any host (Haswell is the minimum that includes RDRAND).
+# Use -march=broadwell so the package set RDRAND/RDSEED-emits
+# identically on any host (Broadwell is the minimum that
+# includes both RDRAND and RDSEED).
 RUN sed -i \
-    's/^COMMON_FLAGS=.*/COMMON_FLAGS="-march=haswell -O2 -pipe"/' \
+    's/^COMMON_FLAGS=.*/COMMON_FLAGS="-march=broadwell -O2 -pipe"/' \
     /etc/portage/make.conf \
     && echo "MAKEOPTS=\"-j$(nproc)\"" >> /etc/portage/make.conf \
     && echo 'FEATURES="-sandbox -usersandbox -pid-sandbox"' \
        >> /etc/portage/make.conf
 
-# Confirm -march=haswell enables RDRAND.
+# Confirm -march=broadwell enables both RDRAND and RDSEED.
 RUN echo 'int main(){}' > /tmp/test.c \
-    && gcc -march=haswell -dM -E /tmp/test.c | grep -q __RDRND__ \
-    || { echo "gcc -march=haswell did not define __RDRND__;" \
-         "compiler is misconfigured." >&2; \
-         exit 1; } \
+    && gcc -march=broadwell -dM -E /tmp/test.c | grep -q __RDRND__ \
+    && gcc -march=broadwell -dM -E /tmp/test.c | grep -q __RDSEED__ \
+    || { echo "gcc -march=broadwell did not define both" \
+         "__RDRND__ and __RDSEED__; compiler is misconfigured." \
+         >&2; exit 1; } \
     && rm /tmp/test.c
 
 # Accept licenses needed by some crypto packages.

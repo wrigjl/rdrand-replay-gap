@@ -126,11 +126,14 @@ exact-count reproduction is not guaranteed:
    a rebuild a week later may install different upstream
    versions.  The artifact's Dockerfile does not pin a portage
    snapshot.
-2. **Compiler target**.  The Dockerfile sets `-march=haswell`
+2. **Compiler target**.  The Dockerfile sets `-march=broadwell`
    (rather than the host-dependent `-march=native` used during
-   the paper's original scan) so the RDRAND-emitting package
-   set is identical on any host CPU that includes Haswell as
-   a strict superset.  Reproducers should not change this.
+   the paper's original scan) so the RDRAND/RDSEED-emitting
+   package set is identical on any host CPU that includes
+   Broadwell as a strict superset.  Broadwell is the earliest
+   Intel microarchitecture that enables both RDRAND and RDSEED;
+   Haswell would cover RDRAND only.  Reproducers should not
+   change this.
 3. **USE flags**.  Defaults shift over time; this affects
    which optional features compile in and whether some
    binaries are produced at all.
