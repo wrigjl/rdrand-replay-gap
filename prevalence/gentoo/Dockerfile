@@ -39,17 +39,39 @@ RUN echo 'int main(){}' > /tmp/test.c \
 # Accept licenses needed by some crypto packages.
 RUN echo 'ACCEPT_LICENSE="*"' >> /etc/portage/make.conf
 
-# Sync the portage tree.  This snapshot is NOT pinned -- emerge
-# --sync pulls whatever is current on the day of build, which is
-# the principal source of reproducibility drift on Gentoo (see
-# Gentoo Reproducibility Caveats in the artifact README).
-RUN emerge --sync --quiet
+# Sync the portage tree using emerge-webrsync (downloads an
+# atomic, dated tarball snapshot instead of using rsync, which
+# is prone to mid-transfer Manifest mismatches).  This snapshot
+# is NOT pinned -- emerge-webrsync pulls whatever is current on
+# the day of build, which is the principal source of
+# reproducibility drift on Gentoo (see Gentoo Reproducibility
+# Caveats in the artifact README).
+RUN emerge-webrsync --verbose
 
-# Rebuild the entire system with -march=haswell.  Portage
+# Rebuild the entire system with -march=broadwell.  Portage
 # handles dependency ordering (gcc and glibc before everything
 # that depends on them).  This is slow but produces an image
 # that accurately represents a real Gentoo installation.
-RUN emerge -e --quiet-build --jobs=$(nproc) @world
+#
+# sys-apps/portage is excluded because rebuilding portage from
+# within an active emerge run trips a self-update bootstrap
+# bug (post-install hook fails with
+# "ModuleNotFoundError: No module named 'portage.dbapi._SyncfsProcess'"
+# because the new portage's import tree is only partially
+# installed when the hook runs).  Portage is pure Python; it
+# does not emit RDRAND and gains nothing from the broadwell
+# target, so skipping it is safe for our prevalence scan.
+#
+# --autounmask=y --autounmask-write=y --autounmask-continue: portage
+# regularly needs to flip USE flags during rolling upgrades (e.g.
+# enabling python_targets_python3_13 across a tree).  Without these
+# flags, emerge stops with "USE changes are necessary to proceed"
+# and dumps suggested package.use lines for human review.  We
+# accept whatever emerge proposes and continue, which is consistent
+# with the "snapshot of whatever portage is offering today" goal.
+RUN emerge --autounmask=y --autounmask-write=y --autounmask-continue \
+    -e --quiet-build --jobs=$(nproc) \
+    --exclude sys-apps/portage @world
 
 # Emerge additional packages not in the stage3 that are
 # relevant to the RDRAND prevalence comparison with Debian:
