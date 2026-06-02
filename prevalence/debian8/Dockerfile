@@ -59,8 +59,9 @@ RUN ulimit -n 1024 && \
         libbotan-1.10-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Scan scripts are copied in by the build context.
-COPY scan_rdrand.sh /scan/scan_rdrand.sh
+# Scan scripts are copied from the repo's canonical location.
+# Build from the repo root: docker build -f prevalence/debian8/Dockerfile .
+COPY scripts/scan_rdrand.sh /scan/scan_rdrand.sh
 RUN chmod +x /scan/scan_rdrand.sh
 
 CMD ["/bin/bash"]

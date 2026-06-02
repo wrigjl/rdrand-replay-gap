@@ -99,10 +99,16 @@ On usr-merged systems (Debian 12+, Gentoo with merged-usr profile),
 so each directory is scanned exactly once.
 
 To regenerate the per-release corpora used in the paper, build
-each `prevalence/<distro>/Dockerfile` and run `scan_rdrand.sh`
-inside. Debian 13 (Trixie) is intended to be scanned directly on
-a host install; the older releases use containerized
-filesystems.
+each `prevalence/<distro>/Dockerfile` from the repo root and
+run `/scan/scan_rdrand.sh` inside:
+
+```bash
+docker build -t rdrand-debian10 -f prevalence/debian10/Dockerfile .
+docker run --rm rdrand-debian10 /scan/scan_rdrand.sh
+```
+
+Debian 13 (Trixie) is intended to be scanned directly on a host
+install; the older releases use containerized filesystems.
 
 **Replay-divergence experiments** (paper §4.2, §5.1):
 

@@ -7,8 +7,8 @@
 # broadwell here makes both instruction families reachable
 # through -march alone.
 #
-# Usage:
-#   docker build -t gentoo-rdrand .
+# Usage (run from the repo root, not this directory):
+#   docker build -t gentoo-rdrand -f prevalence/gentoo/Dockerfile .
 #   docker run --rm gentoo-rdrand /scan/scan_rdrand.sh
 #
 # After running this, capture reproducibility metadata:
@@ -20,12 +20,21 @@ FROM gentoo/stage3:latest
 # Use -march=broadwell so the package set RDRAND/RDSEED-emits
 # identically on any host (Broadwell is the minimum that
 # includes both RDRAND and RDSEED).
+#
+# USE="elogind" is required for gnome-base/gnome-session, which
+# has REQUIRED_USE="exactly-one-of ( elogind systemd )".  Since
+# containers don't run systemd-as-init, elogind is the right
+# choice for login-session management.  Setting it here (before
+# the @world -e rebuild) keeps the resulting image internally
+# consistent: every package that has an elogind/systemd USE
+# decision is built the same way.
 RUN sed -i \
     's/^COMMON_FLAGS=.*/COMMON_FLAGS="-march=broadwell -O2 -pipe"/' \
     /etc/portage/make.conf \
     && echo "MAKEOPTS=\"-j$(nproc)\"" >> /etc/portage/make.conf \
     && echo 'FEATURES="-sandbox -usersandbox -pid-sandbox"' \
-       >> /etc/portage/make.conf
+       >> /etc/portage/make.conf \
+    && echo 'USE="elogind"' >> /etc/portage/make.conf
 
 # Confirm -march=broadwell enables both RDRAND and RDSEED.
 RUN echo 'int main(){}' > /tmp/test.c \
@@ -94,8 +103,9 @@ RUN emerge --quiet-build --jobs=$(nproc) \
     app-editors/vim \
     gnome-base/gnome-light
 
-# Copy scan scripts into the image.
-COPY scan_rdrand.sh check_rdrand_gating.sh /scan/
+# Copy scan scripts into the image from the repo's canonical location.
+# Build from the repo root: docker build -f prevalence/gentoo/Dockerfile .
+COPY scripts/scan_rdrand.sh scripts/check_rdrand_gating.sh /scan/
 RUN chmod +x /scan/*.sh
 
 # Verify the build actually produced RDRAND instructions.
