@@ -9,6 +9,10 @@ a.out
 *.tar.xz
 *.tar.gz
 
+# Release-asset staging dir, populated by
+# scripts/build_release_tarballs.sh and uploaded to GitHub Releases.
+release-assets/
+
 # rr traces
 .rr-trace*/
 
