@@ -106,15 +106,23 @@ filesystems.
 
 **Replay-divergence experiments** (paper §4.2, §5.1):
 
-Each `experiments/exp*/` directory contains a shell script that
-builds the test program, records it under `rr`, and replays.
-Example:
+Each `experiments/exp*/` directory contains a `run.sh` that
+builds the test program, records it under `rr`, replays, and
+emits a one-line machine-readable `RESULT:` record.  Run the
+whole suite via the top-level driver:
 
 ```bash
-cd experiments/exp2-intrinsic/
-./exp2-intrinsic.sh   # -mrdrnd build: replay diverges
-./exp2-control.sh     # control build: replay faithful
+docker build -t rdrand-experiments -f experiments/Dockerfile .
+docker run --rm \
+    --security-opt seccomp=unconfined \
+    --cap-add=SYS_PTRACE \
+    rdrand-experiments
 ```
+
+The driver writes a per-experiment transcript and summary into
+`experiments/exp*/expected/` for diffing across hosts.  The host
+kernel must have `kernel.perf_event_paranoid <= 1` for rr's
+`perf_event_open` path.
 
 ## Gentoo reproducibility caveats
 

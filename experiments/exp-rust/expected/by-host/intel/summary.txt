@@ -1,0 +1,2 @@
+RESULT: name=exp-rust-default exit_record=0 exit_replay=0 diverged=no rr_errors=0 expected=faithful vendor=intel
+RESULT: name=exp-rust-tf-rdrand exit_record=0 exit_replay=0 diverged=yes rr_errors=0 expected=diverged vendor=intel

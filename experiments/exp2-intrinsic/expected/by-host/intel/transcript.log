@@ -1,0 +1,10 @@
+=== exp2-intrinsic (intrinsic build) ===
+--- objdump: rdrand / cpuid sites ---
+    10e6:	48 0f c7 f1          	rdrand %rcx
+RESULT: name=exp2-intrinsic exit_record=0 exit_replay=1 diverged=yes rr_errors=2 expected=diverged vendor=intel
+=== exp2-control (CPUID-gated build) ===
+--- objdump: rdrand / cpuid sites ---
+    10c5:	0f a2                	cpuid
+    10d3:	48 0f c7 f1          	rdrand %rcx
+    110b:	0f a2                	cpuid
+RESULT: name=exp2-control exit_record=0 exit_replay=0 diverged=no rr_errors=0 expected=faithful vendor=intel

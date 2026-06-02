@@ -1,0 +1,4 @@
+=== exp1-random-device ===
+--- objdump: rdrand / cpuid sites in libstdc++ caller ---
+(none in main binary; library path is dynamic)
+RESULT: name=exp1-random-device exit_record=0 exit_replay=0 diverged=no rr_errors=0 expected=diverged vendor=amd

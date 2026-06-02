@@ -1,0 +1,25 @@
+=== exp-rust (default build) ===
+--- objdump: rdrand / cpuid sites (default) ---
+00000000000088e0 <_ZN4core9core_arch6x86_646rdrand14_rdrand64_step17h9a87a86d8efa3a9dE>:
+    88e0:	48 0f c7 f1          	rdrand %rcx
+    89bb:	0f a2                	cpuid
+    89d4:	e8 07 ff ff ff       	call   88e0 <_ZN4core9core_arch6x86_646rdrand14_rdrand64_step17h9a87a86d8efa3a9dE>
+RESULT: name=exp-rust-default exit_record=0 exit_replay=0 diverged=no rr_errors=0 expected=faithful vendor=intel
+=== exp-rust (target-feature=+rdrand) ===
+warning: unused import: `__cpuid`
+  --> src/main.rs:20:25
+   |
+20 | use std::arch::x86_64::{__cpuid, _rdrand64_step};
+   |                         ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+--- objdump: rdrand / cpuid sites (+rdrand) ---
+    8926:	48 0f c7 f0          	rdrand %rax
+    8a2c:	48 0f c7 f0          	rdrand %rax
+    8a90:	48 0f c7 f0          	rdrand %rax
+    8af4:	48 0f c7 f0          	rdrand %rax
+    8ba9:	48 0f c7 f0          	rdrand %rax
+    8ca5:	48 0f c7 f0          	rdrand %rax
+    8da1:	48 0f c7 f0          	rdrand %rax
+RESULT: name=exp-rust-tf-rdrand exit_record=0 exit_replay=0 diverged=yes rr_errors=0 expected=diverged vendor=intel

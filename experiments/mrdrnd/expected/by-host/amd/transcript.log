@@ -1,0 +1,4 @@
+=== mrdrnd ===
+--- objdump: rdrand / cpuid sites ---
+    1194:	48 0f c7 f0          	rdrand %rax
+RESULT: name=mrdrnd exit_record=0 exit_replay=0 diverged=yes rr_errors=0 expected=diverged vendor=amd

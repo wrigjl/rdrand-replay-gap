@@ -1,0 +1,6 @@
+=== exp4-openssl ===
+RESULT: name=exp4-openssl exit_record=0 exit_replay=0 diverged=no rr_errors=0 expected=faithful vendor=intel
+=== exp4-stdrand ===
+RESULT: name=exp4-stdrand exit_record=0 exit_replay=0 diverged=no rr_errors=0 expected=faithful vendor=intel
+=== exp7-stdrand (explicit tokens) ===
+RESULT: name=exp7-stdrand exit_record=0 exit_replay=0 diverged=no rr_errors=0 expected=faithful vendor=intel

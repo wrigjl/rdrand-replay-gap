@@ -1,0 +1,3 @@
+=== exp3-silent ===
+RESULT: name=exp3-silent exit_record=0 exit_replay=0 diverged=yes rr_errors=0 expected=diverged vendor=amd
+--- detail: stdout_diverged=yes stderr_diverged=yes ---

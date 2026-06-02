@@ -1,0 +1,2 @@
+RESULT: name=exp2-intrinsic exit_record=0 exit_replay=1 diverged=yes rr_errors=2 expected=diverged vendor=intel
+RESULT: name=exp2-control exit_record=0 exit_replay=0 diverged=no rr_errors=0 expected=faithful vendor=intel

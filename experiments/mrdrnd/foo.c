@@ -1,5 +1,6 @@
+#include <immintrin.h>
 #include <stdint.h>
-static void generate_key(uint64_t key[4])
+void generate_key(uint64_t key[4])
 {
     unsigned long long v;
     int i;
