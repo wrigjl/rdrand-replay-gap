@@ -21,7 +21,11 @@ FROM gentoo/stage3:latest
 # identically on any host (Broadwell is the minimum that
 # includes both RDRAND and RDSEED).
 #
-# USE flags required to build gnome-light, in order of cause:
+# USE flags required to build gnome-light.  Each flag is listed
+# with the package whose REQUIRED_USE clause forces it (verified
+# via `emerge -p --autounmask-backtrack=y gnome-base/gnome-light`
+# inside the pre-gnome image; no REQUIRED_USE failures remain with
+# this set).
 #   elogind  -- gnome-session REQUIRED_USE="exactly-one-of ( elogind
 #               systemd )".  Containers don't run systemd-as-init,
 #               so elogind is the right login-session manager.
@@ -30,23 +34,24 @@ FROM gentoo/stage3:latest
 #               default; pulls in udev as a dependent.
 #   udev     -- forced by wayland's REQUIRED_USE.
 #   X        -- belt-and-suspenders: enabled alongside wayland so
-#               any GUI package that still wants X (xwayland is
-#               profile-forced but full X may be required by
-#               others) doesn't hit a follow-on REQUIRED_USE
-#               failure mid-emerge.  Adds xorg-server to the
-#               build, costing ~30 min and image size, but
-#               minimizes iterate-and-rebuild cycles.
+#               any GUI package that still wants X doesn't hit a
+#               follow-on REQUIRED_USE failure mid-emerge.
+#   alsa     -- libcanberra REQUIRED_USE="udev? ( alsa )", forced
+#               in once udev is on (above).
 #
 # Setting these here (before the @world -e rebuild) keeps the
 # resulting image internally consistent: every package that has
-# an X/wayland/elogind/systemd USE decision is built the same way.
+# an X/wayland/elogind/systemd/alsa USE decision is built the
+# same way.  Per-package USE flag adjustments (gtk, pulseaudio,
+# dbus, etc.) are handled automatically by --autounmask-continue
+# in the emerge command below.
 RUN sed -i \
     's/^COMMON_FLAGS=.*/COMMON_FLAGS="-march=broadwell -O2 -pipe"/' \
     /etc/portage/make.conf \
     && echo "MAKEOPTS=\"-j$(nproc)\"" >> /etc/portage/make.conf \
     && echo 'FEATURES="-sandbox -usersandbox -pid-sandbox"' \
        >> /etc/portage/make.conf \
-    && echo 'USE="elogind wayland udev X"' >> /etc/portage/make.conf
+    && echo 'USE="elogind wayland udev X alsa"' >> /etc/portage/make.conf
 
 # Confirm -march=broadwell enables both RDRAND and RDSEED.
 RUN echo 'int main(){}' > /tmp/test.c \
