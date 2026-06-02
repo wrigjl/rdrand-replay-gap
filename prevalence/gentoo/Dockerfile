@@ -21,20 +21,32 @@ FROM gentoo/stage3:latest
 # identically on any host (Broadwell is the minimum that
 # includes both RDRAND and RDSEED).
 #
-# USE="elogind" is required for gnome-base/gnome-session, which
-# has REQUIRED_USE="exactly-one-of ( elogind systemd )".  Since
-# containers don't run systemd-as-init, elogind is the right
-# choice for login-session management.  Setting it here (before
-# the @world -e rebuild) keeps the resulting image internally
-# consistent: every package that has an elogind/systemd USE
-# decision is built the same way.
+# USE flags required to build gnome-light, in order of cause:
+#   elogind  -- gnome-session REQUIRED_USE="exactly-one-of ( elogind
+#               systemd )".  Containers don't run systemd-as-init,
+#               so elogind is the right login-session manager.
+#   wayland  -- mutter (gnome-shell's compositor) REQUIRED_USE
+#               "any-of ( X wayland )".  Wayland is GNOME 48's
+#               default; pulls in udev as a dependent.
+#   udev     -- forced by wayland's REQUIRED_USE.
+#   X        -- belt-and-suspenders: enabled alongside wayland so
+#               any GUI package that still wants X (xwayland is
+#               profile-forced but full X may be required by
+#               others) doesn't hit a follow-on REQUIRED_USE
+#               failure mid-emerge.  Adds xorg-server to the
+#               build, costing ~30 min and image size, but
+#               minimizes iterate-and-rebuild cycles.
+#
+# Setting these here (before the @world -e rebuild) keeps the
+# resulting image internally consistent: every package that has
+# an X/wayland/elogind/systemd USE decision is built the same way.
 RUN sed -i \
     's/^COMMON_FLAGS=.*/COMMON_FLAGS="-march=broadwell -O2 -pipe"/' \
     /etc/portage/make.conf \
     && echo "MAKEOPTS=\"-j$(nproc)\"" >> /etc/portage/make.conf \
     && echo 'FEATURES="-sandbox -usersandbox -pid-sandbox"' \
        >> /etc/portage/make.conf \
-    && echo 'USE="elogind"' >> /etc/portage/make.conf
+    && echo 'USE="elogind wayland udev X"' >> /etc/portage/make.conf
 
 # Confirm -march=broadwell enables both RDRAND and RDSEED.
 RUN echo 'int main(){}' > /tmp/test.c \
