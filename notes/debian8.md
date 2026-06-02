@@ -2,98 +2,147 @@
 
 ## Binaries Scanned
 
-Three binaries extracted from a Debian 8 (Jessie) system:
+Four binaries from a Debian 8 (Jessie) container, scanned via
+the artifact's `prevalence/debian8/Dockerfile` (which installs
+`task-gnome-desktop` plus `libbotan-1.10-0` so that all four
+cryptographic libraries enumerated in the paper are present
+where available — Debian 8 base does not ship `libssl1.1`, so
+the libcrypto family is represented by the OpenSSL 1.0.0 ABI
+only).
+
+This file documents the **container-reproducible** corpus.  An
+earlier disassembly pass against a fortuitous host install
+(captured in this repo's history as the original
+`notes/debian8.md`) found `libcrypto.so.1.1` from
+`jessie-backports`; reproducers using only the base archive
+will not see that binary.
 
 | Path | Package |
 |---|---|
 | `lib/x86_64-linux-gnu/libgcrypt.so.20.0.3` | libgcrypt20 |
 | `usr/lib/x86_64-linux-gnu/libcrypto.so.1.0.0` | libssl1.0.0 |
 | `usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.20` | libstdc++6 |
+| `usr/lib/libbotan-1.10.so.0.8` | libbotan-1.10-0 |
 
-Note: no libssl1.1 on Debian 8 (OpenSSL 1.1 was not packaged until Stretch).
-
-## Gating Results (check_rdrand_gating.sh)
+## Gating Results (manual disassembly)
 
 ```
-GATED   libgcrypt.so.20.0.3   (1 function)
-UNGATED libcrypto.so.1.0.0    (1 function)
-UNGATED libstdc++.so.6.0.20   (1 function)
+GATED   libgcrypt.so.20.0.3   (co-located CPUID in gcry_is_secure)
+UNGATED libcrypto.so.1.0.0    (cached OPENSSL_ia32cap_P)
+UNGATED libstdc++.so.6.0.20   (caller-side _M_init; Intel-only on D8)
+UNGATED libbotan-1.10.so.0.8  (caller-side Botan::CPUID singleton)
 ```
 
-Both UNGATED results are heuristic artifacts.  Manual disassembly confirms
-all three libraries use cached or caller-level CPUID checks.
+The three UNGATED results are heuristic artifacts in the sense
+documented for D9–D13: each binary uses a cached CPUID flag
+checked before the RDRAND wrapper is reached, but the CPUID
+check is in a different function from the RDRAND instruction
+and so does not satisfy the `check_rdrand_gating.sh`
+co-location heuristic.  All four binaries are effectively
+gated under manual disassembly.
+
+The static `check_rdrand_gating.sh` script does not run as-is on
+Debian 8: the script uses gawk extensions (`pattern1 ||
+pattern2 { ... }`) that gawk 4.1.1 in jessie rejects despite
+later gawk versions accepting them.  Gating classifications
+above were produced by manual inspection of the disassembly.
 
 ---
 
 ## Per-Binary Analysis
 
-### libgcrypt.so.20.0.3 — GATED
+### libgcrypt.so.20.0.3 — GATED (co-located CPUID)
 
-Function `gcry_is_secure` at `0xade0` contains both CPUID and RDRAND in the
-same function body.  Co-located gate; consistent with D9 and D13.
+RDRAND retry loop attributed by stripped symbols to
+`gcry_is_secure+0x94df3`.  The same retry-loop pattern that
+appears in every later libgcrypt version analyzed in this
+repo:
+
+```
+9fbd3:  rdrand %rax
+9fbd7:  jb     9fbdd        # success
+9fbd9:  dec    %ecx
+9fbdb:  jne    9fbd3        # retry
+```
+
+5 separate CPUID instructions appear elsewhere in the binary,
+the relevant one being the leaf-1 CPUID inside libgcrypt's
+HWF (HardWare Features) initialization that sets the cached
+flag callers test before invoking the RDRAND wrapper.
 
 ---
 
-### libcrypto.so.1.0.0 — UNGATED (stripped symbol artifact)
+### libcrypto.so.1.0.0 — UNGATED (cached `ia32cap`)
 
-RDRAND at `0x75b05`, labeled by objdump as `OPENSSL_cleanse+0xd5` due to
-stripped symbols.  The actual function is the same RDRAND asm stub pattern
-seen in libcrypto 1.0.2 (D9) and libcrypto 3 (D13): a retry loop using the
-CF flag.
-
-CPUID lives in `OPENSSL_init` at `0x75870` (four CPUID calls at `0x758c5`,
-`0x75921`, `0x75932`, `0x7594c`), populating the cached `OPENSSL_ia32cap_P`
-array.  `ENGINE_load_rdrand` at `0xf4180` reads the cached word and tests
-the RDRAND bit before enabling the engine:
+12 RDRAND instances across the binary (a count consistent with
+OpenSSL 1.0.x's per-architecture retry-loop stubs:
+`OPENSSL_ia32_cpuid` writes the cached CPUID word, and the
+RDRAND stub at `OPENSSL_cleanse+0xd5` is reached via an
+ENGINE_load_rdrand registration that tests the cached
+RDRAND bit before activating the engine).
 
 ```
-f4180:  lea   0x308a59(%rip),%rax    # points into OPENSSL_ia32cap_P
-f4187:  testb $0x40,0x7(%rax)        # test RDRAND bit
-f418b:  jne   f4190                  # skip (no RDRAND) if bit clear
-f418d:  ret
+75b05:  rdrand %rax
+75b09:  jb     75b0d        # success
+75b0b:  loop   75b05        # retry up to 8 times
+75b0d:  cmp    $0x0,%rax
+75b11:  cmove  %rcx,%rax
 ```
 
-Identical pattern to libcrypto 1.0.2 (D9) and libcrypto 3 (D13).
-
-**Verdict**: cached CPUID init via `OPENSSL_init`.
+Same `ENGINE_load_rdrand` gating pattern as libcrypto.so.1.0.2
+on D9.  Symbol-stripping attribution shows the RDRAND stub as
+sitting "inside" `OPENSSL_cleanse` only because of how the
+RDRAND asm stub falls within `OPENSSL_cleanse`'s stripped
+text region.
 
 ---
 
-### libstdc++.so.6.0.20 — UNGATED (caller-gated, Intel-only)
+### libstdc++.so.6.0.20 — UNGATED (Intel-only dispatch)
 
-RDRAND at `__once_proxy+0x45` (`0xb5b85`).  The CPUID gate is in `_M_init`
-(`_ZNSt13random_device7_M_initERKSs`) at `0xb5bb0`.
-
-Dispatch logic in `_M_init`:
+RDRAND retry-loop inside `__once_proxy`:
 
 ```
-b5bc7:  call  basic_string::compare("default")
-b5bce:  jne   b5c08                  # not "default" token, try others
-b5bd0:  cpuid                        # leaf 0: get vendor string
-b5bd4:  je    b5bde                  # EAX==0: no CPUID, fallback
-b5bd6:  cmp   $0x756e6547,%ebx       # "Genu" (Intel)?
-b5bdc:  je    b5c40                  # yes: check RDRAND bit
-        # fall through to /dev/urandom (AMD not checked)
-b5bef:  call  fopen                  # open /dev/urandom
-...
-b5c40:  mov   $0x1,%eax
-b5c45:  cpuid                        # leaf 1: feature flags
-b5c47:  and   $0x40000000,%ecx       # ECX bit 30 = RDRAND
-b5c4d:  je    b5bde                  # not supported: /dev/urandom
-        # RDRAND supported: set pointer to null (RDRAND path)
-b5c4f:  movq  $0x0,0x0(%rbp)
-b5c5b:  ret
+b5b85:  rdrand %eax
+b5b88:  mov    %eax,(%rsi)
+b5b8a:  cmovb  %ecx,%eax        # retry if not successful
+b5b8d:  test   %eax,%eax
+b5b8f:  je     b5b80            # retry
 ```
 
-Identical Intel-only check to libstdc++ 6.0.22 (D9): `cmp $0x756e6547,%ebx`
-with no AMD ("Auth") branch.  On AMD hardware `std::random_device{}`
-falls back to `/dev/urandom`.
+`std::random_device::_M_init` (`b5bb0`) holds the CPUID
+dispatch.  As noted in the paper (§4.2), the 6.0.20–6.0.25
+generation checks only for Intel vendor strings before
+invoking RDRAND; the AMD path falls back to `/dev/urandom`.
+This is the period before 6.0.28 (D11) added AMD vendor
+detection to extend RDRAND dispatch onto AMD hardware.
 
-Also present: `_M_init_pretr1` at `0xb5c60`.  This is a software Mersenne
-Twister seeder (pre-TR1 PRNG path); it contains no RDRAND and is not
-relevant to the gating analysis.
+Under rr with CPUID faulting, `_M_init` sees no RDRAND
+support and the retry-loop is not reached.
 
-**Verdict**: caller-gated via `_M_init` CPUID; Intel-only on this version.
+---
+
+### libbotan-1.10.so.0.8 — UNGATED (caller-side singleton)
+
+RDRAND instruction sits within the stripped-symbol region
+attributed to `std::deque<std::string>::_M_push_back_aux` —
+the classic libbotan symbol-layout artifact also seen on
+D13's Botan 2.  The actual containing function is
+Botan 1.10's `Processor_RNG` reseed implementation.
+
+```
+136da2:  rdrand %eax
+136da5:  adc    $0x0,%edx
+136da8:  cmp    $0x1,%edx
+136dab:  mov    %eax,0xc(%rsp)
+136daf:  jne    136d98          # retry
+```
+
+Two CPUID instances appear elsewhere in the binary, in
+Botan 1.10's `CPUID::initialize()` (the analogue of Botan 2's
+`CPUID::state()`).  Callers consult the cached
+`CPUID::has_rdrand()` singleton before instantiating
+`Processor_RNG`, matching the "CPUID singleton" entry in
+Table 2 of the paper.
 
 ---
 
@@ -101,21 +150,40 @@ relevant to the gating analysis.
 
 | Binary | Heuristic | Actual gating mechanism |
 |---|---|---|
-| libgcrypt.so.20.0.3 | GATED | Co-located CPUID in `gcry_is_secure` |
-| libcrypto.so.1.0.0 | UNGATED | Cached `OPENSSL_ia32cap_P` (same as D9, D13) |
-| libstdc++.so.6.0.20 | UNGATED | Caller-gated `_M_init` CPUID; **Intel-only** |
+| libgcrypt.so.20.0.3 | GATED | Co-located CPUID in `gcry_is_secure`-attributed region |
+| libcrypto.so.1.0.0 | UNGATED | Cached `OPENSSL_ia32cap_P`; ENGINE_load_rdrand gates activation |
+| libstdc++.so.6.0.20 | UNGATED | Caller-gated `_M_init`; **Intel-only** (no AMD detection until 6.0.28) |
+| libbotan-1.10.so.0.8 | UNGATED | Caller-side singleton via `Botan::CPUID::has_rdrand()` |
 
-All three libraries are effectively gated.  The gating convention holds on
-Debian 8.
+All four binaries are effectively gated.
 
-## Consistency Across Releases
+## Notable Findings
 
-The Intel-only `std::random_device{}` dispatch is present in both Debian 8
-(libstdc++ 6.0.20) and Debian 9 (libstdc++ 6.0.22), confirming this was a
-stable characteristic of libstdc++ 6.x rather than a version-specific
-quirk.  AMD vendor detection ("Auth") was added in a later libstdc++ release.
+**Smallest corpus in the Debian set**: 4 binaries / 5,567
+scanned, the lowest absolute count of any Debian release
+analyzed.  The growth that follows (5 in D9 because
+`libssl1.1` lands in stretch main, 19+ in D10+ because
+systemd starts using RDRAND directly) is the trajectory the
+paper documents as "the scope of RDRAND exposure expanded
+silently with routine library updates."
 
-OpenSSL's `OPENSSL_init` + cached `ia32cap_P` + `ENGINE_load_rdrand` gate
-pattern is identical across libcrypto 1.0.0 (D8), 1.0.2 (D9), and 3 (D13),
-confirming the pattern has been stable across the entire OpenSSL 1.x/3.x
-lineage covered by these Debian releases.
+**libstdc++ 6.0.20 is the pre-AMD-detection generation**:
+matches the paper's "checked only for Intel vendor strings"
+claim.  Reproducers running the container on AMD hardware
+will see the libstdc++ binary skip RDRAND under
+CPUID faulting — but the binary still contains the
+instruction (the dispatch decision is at runtime, not link
+time).
+
+**libcrypto.so.1.1 is absent**: only `libcrypto.so.1.0.0` is
+in the container.  The paper's earlier scan on a host install
+captured `libcrypto.so.1.1` from `jessie-backports`; the
+reproducible container scan does not enable backports, so
+this binary is not present.  This is the only categorical
+difference between the original-notes corpus and the
+container-reproducible corpus.
+
+**Build hacks required**: D8 is the only release in the
+artifact that requires both `cp /bin/true /usr/bin/gpgv`
+and `ulimit -n 1024` to make apt usable.  See
+`prevalence/debian8/Dockerfile` for the explanation.
