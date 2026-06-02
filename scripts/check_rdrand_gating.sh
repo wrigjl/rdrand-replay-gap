@@ -40,13 +40,13 @@ for f in "$@"; do
     result=$(objdump -d "$f" 2>/dev/null | awk '
     # Function header: "addr <name>:"
     /<.*>:$/ {
-        if (func != "" && has_rdrand) {
+        if (funcname != "" && has_rdrand) {
             if (has_cpuid)
-                printf "  GATED   %s\n", func
+                printf "  GATED   %s\n", funcname
             else
-                printf "  UNGATED %s\n", func
+                printf "  UNGATED %s\n", funcname
         }
-        func = $0
+        funcname = $0
         has_rdrand = 0
         has_cpuid = 0
         next
@@ -56,19 +56,25 @@ for f in "$@"; do
     # objdump format: "  addr:\t<bytes>\t<mnemonic> <operands>"
     # The mnemonic appears after the second tab.
     #
-    # Two separate /regex/ rules rather than `/p1/ || /p2/ {...}` --
-    # the latter is rejected by older gawk (e.g. gawk 4.1.1 shipped
-    # in Debian 8 / jessie) even though it works on newer gawk.
+    # Two awk portability notes (both surfaced by gawk 4.1.1 in
+    # Debian 8 / jessie; newer awks accept either form):
+    #   1. Two separate /regex/ rules below rather than the
+    #      shorter `/p1/ || /p2/ {action}` -- the disjunction
+    #      form is rejected as a syntax error by gawk 4.1.1.
+    #   2. The accumulator is named `funcname`, not `func`.
+    #      gawk treats `func` as a synonym for the `function`
+    #      keyword, so `func = $0` would parse as a malformed
+    #      function definition.
     /\trdrand /                 { has_rdrand = 1 }
     /\trdseed /                 { has_rdrand = 1 }
     /\tcpuid/                   { has_cpuid = 1 }
 
     END {
-        if (func != "" && has_rdrand) {
+        if (funcname != "" && has_rdrand) {
             if (has_cpuid)
-                printf "  GATED   %s\n", func
+                printf "  GATED   %s\n", funcname
             else
-                printf "  UNGATED %s\n", func
+                printf "  UNGATED %s\n", funcname
         }
     }
     ')

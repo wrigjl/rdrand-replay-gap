@@ -98,6 +98,19 @@ On usr-merged systems (Debian 12+, Gentoo with merged-usr profile),
 `/bin /sbin /lib` are symlinks and are filtered out automatically
 so each directory is scanned exactly once.
 
+Both scripts target POSIX `/bin/sh` and any POSIX awk; they avoid
+bash-, gawk-, or GNU-specific extensions deliberately so they can
+run inside any of the per-release containers below.  The verified
+dependency baseline is:
+
+- POSIX `/bin/sh` (tested with `dash`)
+- Any POSIX awk — tested with `gawk` 4.1.1 (Debian 8 / jessie),
+  `mawk` 1.3.3 (Debian 10), and `mawk` 1.3.4 (Debian 13)
+- GNU `binutils` ≥ 2.25 (for `objdump -d`)
+- POSIX `grep` with `-c`
+
+No bash, perl, or python required.
+
 To regenerate the per-release corpora used in the paper, build
 each `prevalence/<distro>/Dockerfile` from the repo root and
 run `/scan/scan_rdrand.sh` inside:
