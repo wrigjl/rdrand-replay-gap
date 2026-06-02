@@ -55,7 +55,12 @@ for f in "$@"; do
     # Match instruction mnemonics in disassembly lines.
     # objdump format: "  addr:\t<bytes>\t<mnemonic> <operands>"
     # The mnemonic appears after the second tab.
-    /\trdrand / || /\trdseed / { has_rdrand = 1 }
+    #
+    # Two separate /regex/ rules rather than `/p1/ || /p2/ {...}` --
+    # the latter is rejected by older gawk (e.g. gawk 4.1.1 shipped
+    # in Debian 8 / jessie) even though it works on newer gawk.
+    /\trdrand /                 { has_rdrand = 1 }
+    /\trdseed /                 { has_rdrand = 1 }
     /\tcpuid/                   { has_cpuid = 1 }
 
     END {

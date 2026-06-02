@@ -1,40 +1,40 @@
 /*
- * Experiment 4: Silent divergence via std::random_device
+ * Experiment 4: std::random_device behavior under rr
  *
- * Demonstrates that rr fails to replay faithfully when the
- * C++ standard library's std::random_device uses RDRAND or
- * RDSEED internally.  On AMD hardware without CPUID faulting
- * (Linux < 6.17), rr cannot suppress libstdc++'s CPUID
- * feature detection during std::random_device construction.
- * The library's _M_init dispatch sets a function pointer to
- * the RDSEED or RDRAND path; each call to operator()() draws
- * entropy from hardware directly with no syscall.  rr has no
- * mechanism to intercept RDRAND or RDSEED; the recorded and
- * replayed outputs therefore differ silently.
+ * Originally written to demonstrate silent replay divergence
+ * via libstdc++'s std::random_device RDRAND/RDSEED fast-path.
+ * Live re-runs on Debian 13 / GCC 14 / libstdc++.so.6 show
+ * that the *default-token* constructor (used here) actually
+ * routes through getrandom(2) rather than the RDRAND/RDSEED
+ * function-pointer dispatch documented in older libstdc++.
+ * RDRAND/RDSEED instructions are still present in
+ * libstdc++.so.6, but reaching them requires an *explicit*
+ * "rdrand" / "rdseed" token (see exp7_stdrand.cpp), and those
+ * callsites are caught by rr's instruction patching of known
+ * library entry points -- the program replays faithfully on
+ * both Intel and AMD with this libstdc++.
  *
- * Unlike exp3_silent.c (which uses inline RDRAND assembly
- * with -mrdrnd), this program contains no RDRAND intrinsics
- * and requires no special compiler flags.  The hardware
- * instruction is reached through the standard library's
- * normal runtime dispatch.
+ * The default-token behavior is therefore now a calibration
+ * point ("this dispatch goes through a syscall, so rr replays
+ * it") rather than a divergence demo.  The actual silent-
+ * divergence demonstrations are exp3_silent.c (inline RDRAND
+ * with -mrdrnd in user code) and exp-rust with
+ * target-feature=+rdrand.
  *
- * Note: OpenSSL 3.x RAND_bytes() does NOT exhibit this
- * divergence because its DRBG is seeded via getrandom(2),
- * a syscall that rr records and replays identically.  The
- * std::random_device path is different: it exposes RDRAND
- * directly as a random number source without DRBG buffering.
+ * Note: OpenSSL 3.x RAND_bytes() also does NOT exhibit
+ * divergence because its DRBG is seeded via getrandom(2).
  *
  * Build:
  *   g++ -O2 -o exp4_stdrand exp4_stdrand.cpp
  *
- * Run on AMD (Linux < 6.17, no CPUID faulting):
+ * Run:
  *   rr record ./exp4_stdrand > rec.txt 2>rec.log
  *   rr replay -a > rep.txt 2>rep.log
  *   diff rec.txt rep.txt
  *
- * Expected: exit code 0 both times, no rr errors, but rec.txt
- * and rep.txt differ because std::random_device drew different
- * RDRAND/RDSEED values on recording vs. replay.
+ * Expected on Debian 13 / GCC 14: rec.txt and rep.txt match
+ * (faithful) because the default-token dispatch goes through
+ * getrandom(2), which rr records and replays identically.
  */
 
 #include <cstdint>
