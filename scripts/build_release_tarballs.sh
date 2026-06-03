@@ -36,14 +36,32 @@
 set -e
 set -u
 
-OUT_DIR="${1:-release-assets}"
+# Usage variants:
+#   build_release_tarballs.sh
+#       -> default outdir, all 7 corpora
+#   build_release_tarballs.sh debian8 debian13
+#       -> default outdir, only the named corpora
+#   build_release_tarballs.sh --out=/tmp/foo debian8
+#       -> custom outdir, just one corpus
+OUT_DIR=release-assets
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --out=*)  OUT_DIR=${1#--out=}; shift ;;
+        --out)    OUT_DIR=$2; shift 2 ;;
+        *)        break ;;
+    esac
+done
+
+if [ $# -eq 0 ]; then
+    set -- debian8 debian9 debian10 debian11 debian12 debian13 gentoo
+fi
+CORPORA="$*"
+
 mkdir -p "$OUT_DIR"
 MANIFEST="$OUT_DIR/MANIFEST.txt"
-: > "$MANIFEST"
-
-# Corpora to build.  Order matches the per-release table in
-# notes/ and the paper's Table 2 prevalence rows.
-CORPORA="debian8 debian9 debian10 debian11 debian12 debian13 gentoo"
+# Append to MANIFEST so partial runs across hosts can co-exist;
+# the moment-of-upload step concatenates the per-host manifests.
+[ -f "$MANIFEST" ] || : > "$MANIFEST"
 
 # Shared extraction recipe.  Runs inside the corpus container,
 # writes the resulting tarball to the bind-mounted /out dir.
