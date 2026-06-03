@@ -134,10 +134,16 @@ for distro in $CORPORA; do
     fi
 
     echo "=== ${distro} ==="
+    # --entrypoint /bin/sh: rdrand-gentoo's stage3 sets
+    # ENTRYPOINT ["/bin/bash"], which prepends "bash" to our
+    # command and mangles "sh -c ..." into "bash sh -c ...".
+    # The debian-based images don't set ENTRYPOINT, so the
+    # override is a no-op for them.
     docker run --rm \
+        --entrypoint /bin/sh \
         -v "$(realpath "$OUT_DIR")":/out \
         "$image" \
-        sh -c "$inner"
+        -c "$inner"
 
     tarball="$OUT_DIR/rdrand-binaries-${distro}.tar.gz"
     sha=$(shasum -a 256 "$tarball" | awk '{print $1}')
