@@ -6,15 +6,19 @@ Thirteen binaries from a Gentoo container built via the
 artifact's `prevalence/gentoo/Dockerfile` (which rebuilds the
 stage3 with `-march=broadwell` so both RDRAND and RDSEED are
 in the target instruction set, then adds the four crypto
-libraries enumerated in Table 2 of the paper plus a small set
-of CLI utilities).
+libraries enumerated in Table 2 of the paper plus the
+`gnome-base/gnome-light` desktop and a small set of CLI utilities).
 
-The container is **CLI-only** — no desktop install, no GNOME
-stack — which is why the absolute binary count (1,933) is
-substantially smaller than the Debian containers (4,500–5,600).
-A `-march=broadwell` rebuild with `gnome-base/gnome-light` would
-be much larger and is left as a follow-up (see
-`prevalence/gentoo/Dockerfile` comments).
+The container scans **3,928 ELF binaries** total — comparable to
+the Debian D13 task-gnome-desktop container's 4,447 — but only
+**13** contain RDRAND or RDSEED.  An earlier CLI-only build of
+the same Dockerfile (without `gnome-base/gnome-light`) scanned
+1,933 binaries and also found the same 13 RDRAND-bearing files.
+**Adding the entire GNOME desktop more than doubled the scanned
+binary count but introduced zero new RDRAND callsites** — direct
+evidence that RDRAND exposure is concentrated in a small set of
+crypto/system libraries rather than spread across the user-facing
+package set.
 
 The portage snapshot used here is **dated 2026-06-02**
 (per `emerge --info`'s "Timestamp of repository gentoo");

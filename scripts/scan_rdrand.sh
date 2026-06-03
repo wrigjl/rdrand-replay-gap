@@ -5,10 +5,13 @@
 # Usage: scan_rdrand.sh [path ...]
 #
 # With no arguments, scans the default set:
-#   /bin /sbin /lib /usr/bin /usr/sbin /usr/lib /usr/libexec /usr/share
-# On usr-merged systems, /bin /sbin /lib are symlinks to their /usr/
-# counterparts; these are filtered out automatically so each
-# directory is scanned exactly once.
+#   /bin /sbin /lib /usr/bin /usr/sbin /usr/lib /usr/lib64 /usr/libexec /usr/share
+# On usr-merged systems (Debian 12+, Gentoo with merged-usr profile),
+# /bin /sbin /lib are symlinks to their /usr/ counterparts and are
+# filtered out automatically so each directory is scanned exactly
+# once.  Same applies to /usr/lib64 when it's a symlink to /usr/lib
+# (multilib Debian); on Gentoo non-merged-usr profiles /usr/lib64
+# is a real directory and is the primary library location.
 #
 # For each ELF binary found under the given paths, disassemble it
 # and check for rdrand/rdseed. If either is present, print the
@@ -20,7 +23,7 @@
 #
 # Summary at end on stderr.
 
-DEFAULT_PATHS="/bin /sbin /lib /usr/bin /usr/sbin /usr/lib /usr/libexec /usr/share"
+DEFAULT_PATHS="/bin /sbin /lib /usr/bin /usr/sbin /usr/lib /usr/lib64 /usr/libexec /usr/share"
 
 if [ $# -eq 0 ]; then
     set -- $DEFAULT_PATHS
