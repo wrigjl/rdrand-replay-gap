@@ -206,6 +206,8 @@ run are committed under `prevalence/gentoo/snapshot/`.
 
 ## Citation
 
+Paper:
+
 ```bibtex
 @inproceedings{wright-wsdf-26,
   author    = {Jason L. Wright and Thomas Baldwin},
@@ -216,6 +218,21 @@ run are committed under `prevalence/gentoo/snapshot/`.
   year      = {2026},
   publisher = {Springer},
   note      = {Co-located with ARES 2026},
+}
+```
+
+Artifact (this repository, archived on Zenodo):
+
+```bibtex
+@software{wright-rdrand-replay-gap-v1,
+  author    = {Jason L. Wright},
+  title     = {rdrand-replay-gap: Reproducibility artifact for
+               'The Residual Nondeterminism Gap in Forensic
+               Record-and-Replay' (WSDF 2026)},
+  year      = {2026},
+  version   = {v1.0},
+  doi       = {10.5281/zenodo.20599973},
+  url       = {https://doi.org/10.5281/zenodo.20599973},
 }
 ```
 
