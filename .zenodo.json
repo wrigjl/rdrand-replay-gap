@@ -1,0 +1,20 @@
+{
+  "title": "rdrand-replay-gap: Reproducibility artifact for 'The Residual Nondeterminism Gap in Forensic Record-and-Replay' (WSDF 2026)",
+  "creators": [
+    {
+      "name": "Wright, Jason L.",
+      "orcid": "0000-0002-6443-1681"
+    }
+  ],
+  "license": "CC-BY-4.0",
+  "upload_type": "software",
+  "keywords": [
+    "record-and-replay",
+    "rr",
+    "RDRAND",
+    "RDSEED",
+    "digital forensics",
+    "reproducibility",
+    "nondeterminism"
+  ]
+}
