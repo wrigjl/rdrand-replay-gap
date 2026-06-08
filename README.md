@@ -53,9 +53,9 @@ prevalence/
         were extracted.
 
 notes/
-    debian{8..12}.md           — per-release disassembly analysis
+    PREVALENCE.md              — per-release disassembly analysis
                                  of every RDRAND-containing binary
-    gentoo.md                  — Gentoo -march=native analysis
+                                 across all seven distributions
     gated.md, gating_detail.txt — gating-mechanism classification
     amd-rdrand.md              — AMD CPUID-faulting-gap experiments
     experiments.md             — running experiment notes
@@ -69,8 +69,8 @@ notes/
 | §3 Rust `target-feature=+rdrand` emits same  | `experiments/exp-rust/`                  |
 | §4 Prevalence scan on Debian 13              | `scripts/scan_rdrand.sh`                 |
 | §4 Gating classification                     | `scripts/check_rdrand_gating.sh`         |
-| §4 Per-release Debian 8–12 confirmation      | `prevalence/debian{8..12}/`, `notes/`    |
-| §4 Gentoo `-march=native` corpus             | `prevalence/gentoo/`, `notes/gentoo.md`  |
+| §4 Per-release Debian 8–13 confirmation      | `prevalence/debian{8..13}/`, `notes/PREVALENCE.md` |
+| §4 Gentoo `-march=broadwell` corpus          | `prevalence/gentoo/`, `notes/PREVALENCE.md` |
 | §4.3 AMD CPUID-faulting gap                  | `experiments/exp1-random-device/`,       |
 |                                              | `experiments/exp4-openssl/`,             |
 |                                              | `notes/amd-rdrand.md`                    |
